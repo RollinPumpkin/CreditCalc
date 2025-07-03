@@ -14,100 +14,121 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Calculator, Building2, AlertCircle, CalendarIcon } from "lucide-react";
-import { format, differenceInMonths, addMonths } from "date-fns";
+import { format, differenceInMonths, addMonths, setYear, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface CalculationResult {
-  loan_amount: number;
-  interest_rate: number;
-  loan_term_months: number;
-  monthly_payment: number;
-  total_payment: number;
-  total_interest: number;
-  payment_schedule: Array<{
+    loan_amount: number;
+    interest_rate: number;
+    loan_term_months: number;
+    monthly_payment: number;
+    total_payment: number;
+    total_interest: number;
+    payment_schedule: Array<{
     month: number;
     payment: number;
     principal: number;
     interest: number;
     balance: number;
-  }>;
+    }>;
 }
 
 export default function CreditCalculatorClient() {
-  const [loanAmount, setLoanAmount] = useState("0");
-  const [interestRate, setInterestRate] = useState("12.5");
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(addMonths(new Date(), 12));
-  const [customerName, setCustomerName] = useState("");
-  const [result, setResult] = useState<CalculationResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [currency, setCurrency] = useState("IDR");
+    const [loanAmount, setLoanAmount] = useState("0");
+    const [interestRate, setInterestRate] = useState("12.5");
+    const [startDate, setStartDate] = useState<Date>(new Date());
+    const [endDate, setEndDate] = useState<Date>(addMonths(new Date(), 12));
+    const [startCalendarMonth, setStartCalendarMonth] = useState<Date>(new Date());
+    const [endCalendarMonth, setEndCalendarMonth] = useState<Date>(addMonths(new Date(), 12));
+    const [customerName, setCustomerName] = useState("");
+    const [result, setResult] = useState<CalculationResult | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
+    const [currency, setCurrency] = useState("IDR");
 
   // Calculate loan term in months based on selected dates
-  const getLoanTermMonths = () => {
+    const getLoanTermMonths = () => {
     return Math.max(1, differenceInMonths(endDate, startDate));
-  };
+    };
 
-  const calculateCredit = async () => {
+  // Generate year options for dropdowns
+    const generateYearOptions = (startYear: number, endYear: number) => {
+    const years = [];
+    for (let year = startYear; year <= endYear; year++) {
+        years.push(year);
+    }
+    return years;
+    };
+
+    const currentYear = getYear(new Date());
+    const yearOptions = generateYearOptions(currentYear, currentYear + 50);
+
+    const calculateCredit = async () => {
     if (!loanAmount || !interestRate || getLoanTermMonths() < 1) {
-      setError("Please fill in all required fields and ensure valid date range");
-      return;
+        setError("Please fill in all required fields and ensure valid date range");
+        return;
     }
 
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/credit/calculate", {
+        const response = await fetch("http://127.0.0.1:8000/api/credit/calculate", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+            "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          loan_amount: parseFloat(loanAmount),
-          interest_rate: parseFloat(interestRate),
-          loan_term_months: getLoanTermMonths(),
+            loan_amount: parseFloat(loanAmount),
+                interest_rate: parseFloat(interestRate),
+            loan_term_months: getLoanTermMonths(),
         }),
-      });
+    });
 
-      if (!response.ok) {
+        if (!response.ok) {
         const errorText = await response.text();
         console.error("API Error:", response.status, errorText);
         throw new Error(`Calculation failed: ${response.status}`);
-      }
+        }
 
-      const data = await response.json();
-      console.log("API Response:", data);
-      if (data.success) {
+        const data = await response.json();
+        console.log("API Response:", data);
+        if (data.success) {
         setResult(data.data);
         // toast.success('Perhitungan berhasil!', {
         //   description: 'Data kredit telah dihitung dengan lengkap.',
         // })
-      } else {
+        } else {
         setError("Calculation failed");
-      }
+        }
     } catch (err) {
-      console.error("Error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(`Failed to calculate: ${errorMessage}`);
+        console.error("Error:", err);
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        setError(`Failed to calculate: ${errorMessage}`);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
-  const saveCalculation = async () => {
+const saveCalculation = async () => {
     if (!result) return;
 
     setSaving(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/credit-calculations", {
+        const response = await fetch("http://127.0.0.1:8000/api/credit-calculations", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -255,10 +276,37 @@ export default function CreditCalculatorClient() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
+                        <div className="p-3 border-b">
+                          <Label className="text-xs text-gray-600 mb-2 block">Tahun</Label>
+                          <Select
+                            value={getYear(startCalendarMonth).toString()}
+                            onValueChange={(year) => {
+                              const newMonth = setYear(startCalendarMonth, parseInt(year));
+                              setStartCalendarMonth(newMonth);
+                              // Also update the selected date to the same year if needed
+                              if (getYear(startDate) !== parseInt(year)) {
+                                setStartDate(setYear(startDate, parseInt(year)));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {yearOptions.map((year) => (
+                                <SelectItem key={year} value={year.toString()}>
+                                  {year}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Calendar
                           mode="single"
                           selected={startDate}
                           onSelect={(date) => date && setStartDate(date)}
+                          month={startCalendarMonth}
+                          onMonthChange={setStartCalendarMonth}
                           disabled={(date) => date < new Date("1900-01-01")}
                           initialFocus
                         />
@@ -283,10 +331,37 @@ export default function CreditCalculatorClient() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
+                        <div className="p-3 border-b">
+                          <Label className="text-xs text-gray-600 mb-2 block">Tahun</Label>
+                          <Select
+                            value={getYear(endCalendarMonth).toString()}
+                            onValueChange={(year) => {
+                              const newMonth = setYear(endCalendarMonth, parseInt(year));
+                              setEndCalendarMonth(newMonth);
+                              // Also update the selected date to the same year if needed
+                              if (getYear(endDate) !== parseInt(year)) {
+                                setEndDate(setYear(endDate, parseInt(year)));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {yearOptions.map((year) => (
+                                <SelectItem key={year} value={year.toString()}>
+                                  {year}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Calendar
                           mode="single"
                           selected={endDate}
                           onSelect={(date) => date && setEndDate(date)}
+                          month={endCalendarMonth}
+                          onMonthChange={setEndCalendarMonth}
                           disabled={(date) => date <= startDate}
                           initialFocus
                         />

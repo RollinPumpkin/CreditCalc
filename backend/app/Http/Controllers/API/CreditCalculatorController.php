@@ -11,6 +11,27 @@ use Illuminate\Support\Facades\Log;
 class CreditCalculatorController extends Controller
 {
     /**
+     * Custom rounding function: 1-500 rounds to 500, 600-999 rounds to next 1000
+     * Also removes decimals by converting to integer
+     */
+    private function customRound($amount)
+    {
+        // First convert to integer to remove decimals
+        $amount = intval($amount);
+        
+        $lastThreeDigits = $amount % 1000;
+        $baseAmount = $amount - $lastThreeDigits;
+        
+        if ($lastThreeDigits >= 1 && $lastThreeDigits <= 500) {
+            return $baseAmount + 500;
+        } elseif ($lastThreeDigits >= 501 && $lastThreeDigits <= 999) {
+            return $baseAmount + 1000;
+        } else {
+            return $amount; // 0 or exact thousands remain unchanged
+        }
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index()
@@ -25,7 +46,7 @@ class CreditCalculatorController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'loan_amount' => 'required|numeric|min:1|max:999999999',
+            'loan_amount' => 'required|numeric|min:1',
             'interest_rate' => 'required|numeric|min:0|max:100',
             'loan_term_months' => 'required|integer|min:1|max:600',
             'customer_name' => 'nullable|string|max:255',
@@ -43,15 +64,19 @@ class CreditCalculatorController extends Controller
         $interestRate = $request->interest_rate / 100; // Convert percentage to decimal
         $loanTermMonths = $request->loan_term_months;
 
-        // Calculate monthly payment using the standard loan formula
+        // Calculate monthly payment using custom formula: (Interest Rate x Loan Amount) + (Loan Amount / Loan Term)
         if ($interestRate > 0) {
-            $monthlyRate = $interestRate / 12;
-            $monthlyPayment = $loanAmount * ($monthlyRate * pow(1 + $monthlyRate, $loanTermMonths)) / 
-                             (pow(1 + $monthlyRate, $loanTermMonths) - 1);
+            $monthlyRate = $interestRate;
+            $interestPortion = $monthlyRate * $loanAmount;
+            $principalPortion = $loanAmount / $loanTermMonths;
+            $monthlyPayment = $interestPortion + $principalPortion;
         } else {
             // For 0% interest rate
             $monthlyPayment = $loanAmount / $loanTermMonths;
         }
+
+        // Apply custom rounding
+        $monthlyPayment = $this->customRound($monthlyPayment);
 
         $totalPayment = $monthlyPayment * $loanTermMonths;
         $totalInterest = $totalPayment - $loanAmount;
@@ -82,7 +107,7 @@ class CreditCalculatorController extends Controller
         Log::info('Calculate method called', ['request_data' => $request->all()]);
         
         $validator = Validator::make($request->all(), [
-            'loan_amount' => 'required|numeric|min:1|max:999999999',
+            'loan_amount' => 'required|numeric|min:1',
             'interest_rate' => 'required|numeric|min:0|max:100',
             'loan_term_months' => 'required|integer|min:1|max:600'
         ]);
@@ -102,12 +127,16 @@ class CreditCalculatorController extends Controller
         $loanTermMonths = $request->loan_term_months;
 
         if ($interestRate > 0) {
-            $monthlyRate = $interestRate / 12;
-            $monthlyPayment = $loanAmount * ($monthlyRate * pow(1 + $monthlyRate, $loanTermMonths)) / 
-                             (pow(1 + $monthlyRate, $loanTermMonths) - 1);
+            $monthlyRate = $interestRate;
+            $interestPortion = $monthlyRate * $loanAmount;
+            $principalPortion = $loanAmount / $loanTermMonths;
+            $monthlyPayment = $interestPortion + $principalPortion;
         } else {
             $monthlyPayment = $loanAmount / $loanTermMonths;
         }
+
+        // Apply custom rounding
+        $monthlyPayment = $this->customRound($monthlyPayment);
 
         $totalPayment = $monthlyPayment * $loanTermMonths;
         $totalInterest = $totalPayment - $loanAmount;
@@ -141,9 +170,10 @@ class CreditCalculatorController extends Controller
                 'total_interest' => round($totalInterest, 2),
                 'payment_schedule' => $paymentSchedule
             ]
-        ])->header('Access-Control-Allow-Origin', '*')
-          ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-          ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        ])
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     }
 
     /**
