@@ -12,7 +12,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calculator, Building2, AlertCircle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calculator, Building2, AlertCircle, CalendarIcon } from "lucide-react";
+import { format, differenceInMonths, addMonths } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface CalculationResult {
   loan_amount: number;
@@ -31,9 +39,10 @@ interface CalculationResult {
 }
 
 export default function CreditCalculatorClient() {
-  const [loanAmount, setLoanAmount] = useState("100000000");
+  const [loanAmount, setLoanAmount] = useState("0");
   const [interestRate, setInterestRate] = useState("12.5");
-  const [loanTermMonths, setLoanTermMonths] = useState("12");
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date>(addMonths(new Date(), 12));
   const [customerName, setCustomerName] = useState("");
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,9 +50,14 @@ export default function CreditCalculatorClient() {
   const [error, setError] = useState("");
   const [currency, setCurrency] = useState("IDR");
 
+  // Calculate loan term in months based on selected dates
+  const getLoanTermMonths = () => {
+    return Math.max(1, differenceInMonths(endDate, startDate));
+  };
+
   const calculateCredit = async () => {
-    if (!loanAmount || !interestRate || !loanTermMonths) {
-      setError("Please fill in all required fields");
+    if (!loanAmount || !interestRate || getLoanTermMonths() < 1) {
+      setError("Please fill in all required fields and ensure valid date range");
       return;
     }
 
@@ -59,7 +73,7 @@ export default function CreditCalculatorClient() {
         body: JSON.stringify({
           loan_amount: parseFloat(loanAmount),
           interest_rate: parseFloat(interestRate),
-          loan_term_months: parseInt(loanTermMonths),
+          loan_term_months: getLoanTermMonths(),
         }),
       });
 
@@ -134,16 +148,16 @@ export default function CreditCalculatorClient() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
           
           {/* Left Panel - Input Form */}
-          <Card className="shadow-2xl border-0 bg-white">
-            <CardHeader className="bg-gradient-to-r from-red-600 to-red-700 text-white rounded-t-lg">
+          <Card className="shadow-2xl border-0 bg-white overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-red-700 to-red-800 text-white">
               <div className="flex items-center gap-3">
-                <div className="bg-white p-2 rounded">
-                  <Calculator className="h-6 w-6 text-red-600" />
+                <div className="bg-white p-2 rounded-lg shadow-sm">
+                  <Calculator className="h-6 w-6 text-red-700" />
                 </div>
                 <div>
                   <CardTitle className="text-xl font-bold">Credit Calculator</CardTitle>
                   <CardDescription className="text-red-100">
-                    Kalkulator Kredit BPR Adiarta
+                    Kalkulator Kredit BPR Adiarta Reksacipta
                   </CardDescription>
                 </div>
               </div>
@@ -163,15 +177,15 @@ export default function CreditCalculatorClient() {
                       const value = e.target.value.replace(/[^\d]/g, "");
                       setLoanAmount(value);
                     }}
-                    className="text-right pr-16 h-12 text-lg font-semibold border-2 focus:border-red-500"
-                    placeholder="100.000.000"
+                    className="text-left pr-16 h-12 text-lg font-semibold border-2 focus:border-red-600 focus:ring-2 focus:ring-red-100"
+                    placeholder="e.g. 50.000.000"
                   />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex">
-                    <span className={`px-2 py-1 text-sm font-bold ${currency === "IDR" ? "bg-red-600 text-white" : "bg-gray-200 text-gray-600"} rounded-l cursor-pointer`}
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex rounded-lg overflow-hidden border border-gray-300">
+                    <span className={`px-3 py-2 text-sm font-bold transition-all cursor-pointer ${currency === "IDR" ? "bg-red-600 text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
                           onClick={() => setCurrency("IDR")}>
                       IDR
                     </span>
-                    <span className={`px-2 py-1 text-sm font-bold ${currency === "USD" ? "bg-red-600 text-white" : "bg-gray-200 text-gray-600"} rounded-r cursor-pointer`}
+                    <span className={`px-3 py-2 text-sm font-bold transition-all cursor-pointer ${currency === "USD" ? "bg-red-600 text-white shadow-md" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
                           onClick={() => setCurrency("USD")}>
                       USD
                     </span>
@@ -193,7 +207,10 @@ export default function CreditCalculatorClient() {
                       step="0.1"
                       value={interestRate}
                       onChange={(e) => setInterestRate(e.target.value)}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      className="w-full h-3 bg-gradient-to-r from-red-200 via-red-400 to-red-600 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                        background: `linear-gradient(to right, #fecaca 0%, #f87171 50%, #dc2626 100%)`,
+                      }}
                     />
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
                       <span>1%</span>
@@ -207,44 +224,84 @@ export default function CreditCalculatorClient() {
                       step="0.1"
                       value={interestRate}
                       onChange={(e) => setInterestRate(e.target.value)}
-                      className="text-right pr-8 h-12 text-lg font-semibold border-2 focus:border-red-500"
+                      className="text-right pr-8 h-12 text-lg font-semibold border-2 focus:border-red-600 focus:ring-2 focus:ring-red-100"
+                      placeholder="e.g. 8.5"
                     />
                     <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">%</span>
                   </div>
                 </div>
               </div>
 
-              {/* Loan Term Slider */}
+              {/* Loan Term Date Picker */}
               <div className="space-y-3">
                 <Label className="text-sm font-semibold text-gray-700">
-                  Lama Pinjaman (Tahun)
+                  Periode Pinjaman
                 </Label>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <input
-                      type="range"
-                      min="6"
-                      max="360"
-                      step="6"
-                      value={loanTermMonths}
-                      onChange={(e) => setLoanTermMonths(e.target.value)}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>6 bln</span>
-                      <span>10 thn</span>
-                      <span>30 thn</span>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Start Date */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-600">Tanggal Mulai</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full h-12 text-left font-normal border-2 hover:border-red-600 focus:border-red-600 focus:ring-2 focus:ring-red-100",
+                            !startDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? format(startDate, "dd/MM/yyyy") : "Pilih tanggal"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={(date) => date && setStartDate(date)}
+                          disabled={(date) => date < new Date("1900-01-01")}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      value={Math.round(parseInt(loanTermMonths) / 12 * 10) / 10}
-                      onChange={(e) => setLoanTermMonths(String(Math.round(parseFloat(e.target.value) * 12)))}
-                      className="text-right pr-16 h-12 text-lg font-semibold border-2 focus:border-red-500"
-                      step="0.5"
-                    />
-                    <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 font-semibold">Tahun</span>
+
+                  {/* End Date */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-600">Tanggal Berakhir</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full h-12 text-left font-normal border-2 hover:border-red-600 focus:border-red-600 focus:ring-2 focus:ring-red-100",
+                            !endDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDate ? format(endDate, "dd/MM/yyyy") : "Pilih tanggal"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={(date) => date && setEndDate(date)}
+                          disabled={(date) => date <= startDate}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                {/* Display calculated loan term */}
+                <div className="bg-gray-50 p-3 rounded-lg border">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Lama Pinjaman:</span>
+                    <span className="text-lg font-semibold text-red-600">
+                      {getLoanTermMonths()} Bulan ({(getLoanTermMonths() / 12).toFixed(1)} Tahun)
+                    </span>
                   </div>
                 </div>
               </div>
@@ -258,8 +315,8 @@ export default function CreditCalculatorClient() {
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="h-12 text-lg border-2 focus:border-red-500"
-                  placeholder="Masukkan nama nasabah"
+                  className="h-12 text-lg border-2 focus:border-red-600 focus:ring-2 focus:ring-red-100"
+                  placeholder="e.g. Budi Santoso"
                 />
               </div>
 
@@ -273,7 +330,7 @@ export default function CreditCalculatorClient() {
               <Button 
                 onClick={calculateCredit} 
                 disabled={loading}
-                className="w-full h-12 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold text-lg shadow-lg"
+                className="w-full h-12 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Menghitung..." : "Hitung"}
               </Button>
@@ -282,34 +339,34 @@ export default function CreditCalculatorClient() {
 
           {/* Right Panel - Results */}
           {result ? (
-            <Card className="shadow-2xl border-0 bg-white">
+            <Card className="shadow-2xl border-0 bg-white overflow-hidden">
               <CardContent className="p-0">
                 {/* Summary Section */}
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-8 rounded-t-lg">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-100 p-8 border-b border-blue-200">
                   <div className="text-center">
-                    <p className="text-sm text-blue-600 font-medium mb-2">ANGSURAN PER BULAN</p>
-                    <h2 className="text-4xl font-bold text-blue-800 mb-4">
+                    <p className="text-sm text-blue-700 font-medium mb-2">ANGSURAN PER BULAN</p>
+                    <h2 className="text-4xl font-bold text-blue-900 mb-4">
                       {formatNumber(result.monthly_payment)}
                     </h2>
                     
-                    <div className="bg-blue-200 rounded-lg p-4 space-y-2">
-                      <h3 className="font-bold text-blue-800 text-sm mb-3">TOTAL ANGSURAN PER BULAN</h3>
+                    <div className="bg-blue-200 rounded-lg p-4 space-y-2 shadow-sm">
+                      <h3 className="font-bold text-blue-900 text-sm mb-3">DETAIL ANGSURAN</h3>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-blue-700">Nominal (Rp)</span>
-                          <span className="font-bold text-blue-800">{formatNumber(result.loan_amount)}</span>
+                          <span className="text-blue-800">Nominal (Rp)</span>
+                          <span className="font-bold text-blue-900">{formatNumber(result.loan_amount)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-blue-700">Jangka Waktu (Bulan)</span>
-                          <span className="font-bold text-blue-800">{result.loan_term_months} Bulan</span>
+                          <span className="text-blue-800">Jangka Waktu (Bulan)</span>
+                          <span className="font-bold text-blue-900">{result.loan_term_months} Bulan</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-blue-700">Suku Bunga Pertahun</span>
-                          <span className="font-bold text-blue-800">{result.interest_rate}%</span>
+                          <span className="text-blue-800">Suku Bunga Pertahun</span>
+                          <span className="font-bold text-blue-900">{result.interest_rate}%</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-blue-700">Tipe Bunga yang digunakan</span>
-                          <span className="font-bold text-blue-800">Flat</span>
+                          <span className="text-blue-800">Tipe Bunga yang digunakan</span>
+                          <span className="font-bold text-blue-900">Flat</span>
                         </div>
                       </div>
                     </div>
@@ -318,7 +375,7 @@ export default function CreditCalculatorClient() {
 
                 {/* Payment Schedule Table */}
                 <div className="p-6">
-                  <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white p-3 rounded-t-lg">
+                  <div className="bg-gradient-to-r from-red-600 to-red-700 text-white p-4 rounded-t-lg shadow-sm">
                     <div className="grid grid-cols-4 gap-4 text-sm font-bold text-center">
                       <div>Periode</div>
                       <div>Angsuran Bunga</div>
@@ -327,8 +384,8 @@ export default function CreditCalculatorClient() {
                     </div>
                   </div>
                   
-                  <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-b-lg">
-                    {result.payment_schedule.slice(0, 5).map((payment, index) => (
+                  <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-b-lg">
+                    {result.payment_schedule.map((payment, index) => (
                       <div key={payment.month} className={`grid grid-cols-4 gap-4 p-3 text-sm text-center ${index % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
                         <div className="font-medium">{getMonthYear(payment.month)}</div>
                         <div className="text-gray-700">{formatNumber(payment.interest)}</div>
@@ -338,15 +395,15 @@ export default function CreditCalculatorClient() {
                     ))}
                     
                     {/* Total Row */}
-                    <div className="grid grid-cols-4 gap-4 p-3 text-sm text-center bg-orange-100 border-t-2 border-orange-300 font-bold">
-                      <div className="text-orange-800">TOTAL</div>
-                      <div className="text-orange-800">
+                    <div className="grid grid-cols-4 gap-4 p-4 text-sm text-center bg-red-50 border-t-2 border-red-300 font-bold">
+                      <div className="text-red-800">TOTAL</div>
+                      <div className="text-red-800">
                         {formatNumber(result.total_interest)}
                       </div>
-                      <div className="text-orange-800">
+                      <div className="text-red-800">
                         {formatNumber(result.loan_amount)}
                       </div>
-                      <div className="text-orange-800">
+                      <div className="text-red-800">
                         {formatNumber(result.total_payment)}
                       </div>
                     </div>
@@ -355,14 +412,14 @@ export default function CreditCalculatorClient() {
                   <div className="flex gap-3 mt-6">
                     <Button
                       onClick={() => setResult(null)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
+                      className="flex-1 bg-slate-600 hover:bg-slate-700 text-white font-semibold py-3 transition-all duration-200 shadow-md hover:shadow-lg"
                     >
                       Hitung Kembali
                     </Button>
                     <Button
                       onClick={saveCalculation}
                       disabled={saving}
-                      className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3"
+                      className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-3 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
                     >
                       {saving ? "Menyimpan..." : "Simpan Perhitungan"}
                     </Button>
