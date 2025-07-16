@@ -1,0 +1,69 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Install All Dependencies",
+            "type": "shell",
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "new"
+            },
+            "windows": {
+                "command": "cmd",
+                "args": [
+                    "/c",
+                    "echo Installing Backend Dependencies... && cd backend && set PATH=C:\\laragon\\bin\\php\\php-8.3.16-Win32-vs16-x64;C:\\laragon\\bin\\composer;C:\\laragon\\bin\\git\\bin;%PATH% && composer install --prefer-source && php artisan key:generate && php artisan migrate && echo Backend Ready! && echo. && echo Installing Frontend Dependencies... && cd ../frontend && npm install && echo Frontend Ready! && echo. && echo All dependencies installed successfully!"
+                ]
+            }
+        },
+        {
+            "label": "Start Backend Server",
+            "type": "shell",
+            "group": "test",
+            "isBackground": true,
+            "windows": {
+                "command": "cmd",
+                "args": ["/c", "cd backend && set PATH=C:\\laragon\\bin\\php\\php-8.3.16-Win32-vs16-x64;%PATH% && php artisan serve"]
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "file": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^Laravel development server started.*$",
+                    "endsPattern": "^.*Development Server \\(http://.*\\) started$"
+                }
+            }
+        },
+        {
+            "label": "Start Frontend Server",
+            "type": "shell",
+            "group": "test",
+            "isBackground": true,
+            "windows": {
+                "command": "cmd",
+                "args": ["/c", "cd frontend && npm run dev"]
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "file": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^.*Local:.*$",
+                    "endsPattern": "^.*Ready in .*$"
+                }
+            }
+        },
+        {
+            "label": "Start Both Servers",
+            "dependsOrder": "parallel",
+            "dependsOn": ["Start Backend Server", "Start Frontend Server"]
+        }
+    ]
+}
